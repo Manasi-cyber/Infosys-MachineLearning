@@ -2,7 +2,7 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
 import random # Used for simulation only
-import requests # Used for real ML API calls
+import requests 
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -14,8 +14,8 @@ from tzlocal import get_localzone
 # ==========================================
 # ⚠️ You must generate an App Password from your Google Account settings.
 # Do not use your normal login password.
-EMAIL_SENDER = "saikarthikreddykuppireddy@gmail.com"  # Your Email
-EMAIL_PASSWORD = "mmci cuhh kwbn sdgo"   # Your App Password
+EMAIL_SENDER = "hiremathmanasi05@gmail.com"  # Your Email
+EMAIL_PASSWORD = "fmfg dncy yuku fvqt"   # Your App Password
 
 # ==========================================
 # 2. INITIALIZE APP & SCHEDULER
@@ -73,7 +73,7 @@ def fetch_backtest_result(ticker: str):
         resp = requests.post(
             "http://127.0.0.1:8002/api/v1/backtest/run",
             json={"ticker": ticker},
-            timeout=5
+            timeout=500
         )
         print(f"DEBUG: [fetch_backtest_result] Response Code: {resp.status_code}")
         if resp.status_code != 200:

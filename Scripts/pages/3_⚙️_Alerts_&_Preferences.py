@@ -42,7 +42,7 @@ def validate_email(email: str) -> bool:
 
 def check_api_status():
     try:
-        response = requests.get(f"{ALERTS_API_URL}/health", timeout=2)
+        response = requests.get(f"{ALERTS_API_URL}/health", timeout=500)
         if response.status_code == 200:
             return True, response.json()
         return False, None
@@ -53,7 +53,7 @@ def check_api_status():
 
 def fetch_active_alerts():
     try:
-        response = requests.get(f"{ALERTS_API_URL}/active-alerts", timeout=3)
+        response = requests.get(f"{ALERTS_API_URL}/active-alerts", timeout=500)
         if response.status_code == 200:
             return response.json().get('jobs', [])
         return []
@@ -70,7 +70,7 @@ def create_alert(email, ticker, time_str):
         response = requests.post(
             f"{ALERTS_API_URL}/create-alert", 
             json=payload,
-            timeout=5
+            timeout=500
         )
         if response.status_code == 200:
             return True, response.json()
@@ -90,7 +90,7 @@ def stop_alert(email, ticker):
     try:
         response = requests.delete(
             f"{ALERTS_API_URL}/stop-alert/{email}/{ticker}",
-            timeout=5
+            timeout=500
         )
         return response.status_code == 200
     except:
@@ -316,7 +316,7 @@ def main():
                                 r = requests.post(
                                     f"{ALERTS_API_URL}/instant-report",
                                     json={"user_email": ir_email, "ticker_name": ir_ticker},
-                                    timeout=15
+                                    timeout=500
                                 )
                                 if r.status_code == 200:
                                     st.success(f"✅ Sent!")

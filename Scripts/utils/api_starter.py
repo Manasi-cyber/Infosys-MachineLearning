@@ -15,7 +15,7 @@ import os
 # Global process handle
 api_process = None
 
-def is_api_running(port=8000, timeout=1):
+def is_api_running(port=8000, timeout=500):
     """Check if API is already running"""
     try:
         response = requests.get(f"http://127.0.0.1:{port}/health", timeout=timeout)

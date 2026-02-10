@@ -12,7 +12,7 @@ API_URL = "http://localhost:8000/api/v1/ml/signal/live"
 def get_stock_details(ticker):
     print(f"Fetching live data for {ticker}...")
     try:
-        response = requests.post(API_URL, json={"ticker": ticker}, timeout=15)
+        response = requests.post(API_URL, json={"ticker": ticker}, timeout=500)
         if response.status_code == 200:
             return response.json()
         print(f"API Error: {response.text}")
