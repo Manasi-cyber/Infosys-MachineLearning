@@ -150,15 +150,6 @@ def calculate_rsi(prices: pd.Series, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
-def get_usd_inr_rate():
-    try:
-        rate = yf.download("USDINR=X", period="1d", interval="1d", progress=False)["Close"].iloc[-1]
-        return float(rate)
-    except Exception as e:
-        print(f"⚠️ USDINR fetch failed: {e}")
-        return 83.0  # fallback rate
-
-
 # =================================================
 # REQUEST SCHEMA
 # =================================================
@@ -207,17 +198,10 @@ def get_live_signal(request: TickerRequest):
         
         latest = df.iloc[-1]
         subset = df.tail(100)
-
-        price = float(latest["Close"])
-
-        # Convert USD → INR only for foreign stocks
-        if not ticker.endswith(".NS"):
-            price = price * get_usd_inr_rate()
-
         
         stock_data = StockData(
             symbol=ticker,
-            current_price=round(price, 2),
+            current_price=float(latest['Close']),
             price_change=float(latest['Close'] - df.iloc[-2]['Close']) if len(df) > 1 else 0.0,
             price_change_pct=float((latest['Close'] - df.iloc[-2]['Close'])/df.iloc[-2]['Close']*100) if len(df) > 1 else 0.0,
             last_updated=datetime.now(),
@@ -248,10 +232,6 @@ def get_live_signal(request: TickerRequest):
         # Add historical-compatible fields if necessary
         result["signal"] = result["action"]
         result["expected_return"] = 0.0 # Heuristics don't provide easy return %
-
-        result["current_price"] = round(price, 2)
-        result["currency"] = "INR"
-
         
         return result
         

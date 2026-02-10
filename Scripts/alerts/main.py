@@ -47,7 +47,7 @@ def fetch_ml_signal(ticker: str):
         resp = requests.post(
             "http://127.0.0.1:8000/api/v1/ml/signal/live",
             json={"ticker": ticker},
-            timeout=500
+            timeout=30
         )
         print(f"DEBUG: [fetch_ml_signal] Response Code: {resp.status_code}")
         if resp.status_code != 200:
@@ -99,7 +99,7 @@ def send_email_alert(user_email: str, ticker: str, signal_data: dict):
         
         # Extract Data
         signal_text = signal_data.get('signal_text', 'UNKNOWN') # e.g. "BUY 🚀"
-        price = float(signal_data.get('current_price', 0.0))
+        price = float(signal_data.get('target_value', 0.0))
         confidence = float(signal_data.get('confidence', 0.0))
         conf_level = signal_data.get('confidence_level', 'Medium')
         frequency = signal_data.get('prediction_frequency', 'Real-time')
@@ -251,7 +251,7 @@ def check_and_alert_job(user_email: str, ticker: str, force: bool = False, alert
         # Prepare Data Payload
         email_data = {
             "signal_text": signal_text,
-            "current_price": live.get("current_price", 0.0),
+            "current_price": live.get("target_value", 0.0),
             "confidence": f"{confidence:.2f}",
             "confidence_level": conf_level,
             "prediction_frequency": alert_type
