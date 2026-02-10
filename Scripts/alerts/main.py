@@ -47,7 +47,7 @@ def fetch_ml_signal(ticker: str):
         resp = requests.post(
             "http://127.0.0.1:8000/api/v1/ml/signal/live",
             json={"ticker": ticker},
-            timeout=30
+            timeout=500
         )
         print(f"DEBUG: [fetch_ml_signal] Response Code: {resp.status_code}")
         if resp.status_code != 200:

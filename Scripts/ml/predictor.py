@@ -138,7 +138,7 @@ class MLEngine:
             res = requests.post(
                 "http://127.0.0.1:11434/api/generate",
                 json={"model": "mistral", "prompt": prompt, "stream": False},
-                timeout=180
+                timeout=500
             )
             
             text = res.json().get("response", "").strip()
@@ -205,7 +205,7 @@ class MLEngine:
             ticker = data.symbol
             
             # fast timeout to not block UI if API is down
-            response = requests.post(url, json={"ticker": ticker}, timeout=20.0)
+            response = requests.post(url, json={"ticker": ticker}, timeout=500.0)
             
             if response.status_code == 200:
                 api_data = response.json()
