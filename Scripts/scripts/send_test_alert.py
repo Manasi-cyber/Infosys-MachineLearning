@@ -4,10 +4,16 @@ from datetime import datetime
 import requests
 import sys
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 # CONFIGURATION
-EMAIL_SENDER = "tarunsivasai03@gmail.com"
-EMAIL_PASSWORD = "odsi iyiq ywar zvba"
-TARGET_EMAIL = "alonewalker07827@gmail.com"
+EMAIL_SENDER = os.getenv("SMTP_USER", "tarunsivasai03@gmail.com")
+EMAIL_PASSWORD = os.getenv("SMTP_PASSWORD", "odsi iyiq ywar zvba")
+TARGET_EMAIL = os.getenv("TEST_RECEIVER", "alonewalker07827@gmail.com")
 TICKER = "AMZN"
 
 def fetch_live_signal(ticker):
@@ -57,8 +63,8 @@ def send_alert(data):
         msg['From'] = EMAIL_SENDER
         msg['To'] = TARGET_EMAIL
 
-        print(f"Sending email to {TARGET_EMAIL}...")
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        print(f"DEBUG: Connecting to smtp.gmail.com:465 as {EMAIL_SENDER}...")
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as server:
             server.login(EMAIL_SENDER, EMAIL_PASSWORD)
             server.sendmail(EMAIL_SENDER, TARGET_EMAIL, msg.as_string())
 

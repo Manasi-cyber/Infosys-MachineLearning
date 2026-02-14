@@ -2,20 +2,25 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime
 import random # Used for simulation only
-import requests 
+import requests # Used for real ML API calls
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from apscheduler.schedulers.background import BackgroundScheduler
 from tzlocal import get_localzone
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 # ==========================================
-# 1. CONFIGURATION (EDIT THIS SECTION)
+# 1. CONFIGURATION (STRICTLY FROM ENV)
 # ==========================================
-# ⚠️ You must generate an App Password from your Google Account settings.
-# Do not use your normal login password.
-EMAIL_SENDER = "hiremathmanasi05@gmail.com"  # Your Email
-EMAIL_PASSWORD = "fmfg dncy yuku fvqt"   # Your App Password
+# Load from .env or system environment variables
+EMAIL_SENDER = os.getenv("SMTP_USER", "saikarthikreddykuppireddy@gmail.com")
+EMAIL_PASSWORD = os.getenv("SMTP_PASSWORD", "fmfg dncy yuku fvqt")
 
 # ==========================================
 # 2. INITIALIZE APP & SCHEDULER
@@ -73,7 +78,7 @@ def fetch_backtest_result(ticker: str):
         resp = requests.post(
             "http://127.0.0.1:8002/api/v1/backtest/run",
             json={"ticker": ticker},
-            timeout=500
+            timeout=5
         )
         print(f"DEBUG: [fetch_backtest_result] Response Code: {resp.status_code}")
         if resp.status_code != 200:
@@ -85,6 +90,24 @@ def fetch_backtest_result(ticker: str):
     except Exception as e:
         print(f"⚠️ Backtest API Connection Failed: {e}")
         return None
+
+def get_usd_inr_rate():
+    """
+    Fetches the latest USD to INR exchange rate from the ML API.
+    Used to display US stock prices in Indian Rupees for the user.
+    """
+    try:
+        # Ticker for USD/INR on YFinance is 'USDINR=X'
+        resp = requests.get("http://127.0.0.1:8000/supabase/ticker/USDINR=X?limit=1", timeout=5)
+        if resp.status_code == 200:
+            data = resp.json().get("data", [])
+            if data:
+                rate = float(data[0]["close"])
+                print(f"DEBUG: [Exchange Rate] 1 USD = {rate:.2f} INR")
+                return rate
+    except Exception as e:
+        print(f"⚠️ [Exchange Rate] Failed to fetch live rate, using manual fallback (84.0): {e}")
+    return 84.0
 
 # ==========================================
 # 4. EMAIL ALERT LOGIC (The Output)
@@ -99,7 +122,7 @@ def send_email_alert(user_email: str, ticker: str, signal_data: dict):
         
         # Extract Data
         signal_text = signal_data.get('signal_text', 'UNKNOWN') # e.g. "BUY 🚀"
-        price = float(signal_data.get('target_value', 0.0))
+        price = float(signal_data.get('current_price', 0.0))
         confidence = float(signal_data.get('confidence', 0.0))
         conf_level = signal_data.get('confidence_level', 'Medium')
         frequency = signal_data.get('prediction_frequency', 'Real-time')
@@ -115,8 +138,15 @@ def send_email_alert(user_email: str, ticker: str, signal_data: dict):
         subject = f"🚨 {signal_text} Alert: {ticker} ({confidence}%)"
         
         # HTML Body
-        # HTML Body - Improved Design
+        # Detect currency and convert if it's a US stock
+        is_us_stock = not (ticker.endswith(".NS") or ticker.endswith(".BO"))
         currency_symbol = "₹"
+        
+        if is_us_stock:
+            rate = get_usd_inr_rate()
+            original_price = price
+            price = price * rate
+            print(f"DEBUG: [Conversion] {ticker} Price: ${original_price:.2f} → ₹{price:,.2f} (Rate: {rate})")
         
         body = f"""
         <html>
@@ -148,7 +178,7 @@ def send_email_alert(user_email: str, ticker: str, signal_data: dict):
                     <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px;">
                         <table style="width: 100%; border-collapse: collapse;">
                             <tr style="border-bottom: 1px solid #eef2f6;">
-                                <td style="padding: 12px 0; color: #64748b; font-size: 14px;">Market Price</td>
+                                <td style="padding: 12px 0; color: #64748b; font-size: 14px;">Market Price (INR)</td>
                                 <td style="padding: 12px 0; font-weight: 700; color: #0f172a; text-align: right; font-size: 16px;">{currency_symbol}{price:,.2f}</td>
                             </tr>
                             <tr style="border-bottom: 1px solid #eef2f6;">
@@ -170,7 +200,7 @@ def send_email_alert(user_email: str, ticker: str, signal_data: dict):
                     
                     <!-- FOOTER -->
                     <div style="margin-top: 32px; text-align: center;">
-                        <div style="background: #f1f5f9; color: #475569; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Open Dashboard</div>
+                        <a href="http://localhost:8501" style="text-decoration: none; background: #f1f5f9; color: #475569; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Open Dashboard</a>
                         <p style="margin-top: 24px; font-size: 11px; color: #94a3b8; line-height: 1.5;">
                             Automated alert generated by AI Signals Platform.<br>
                             Not financial advice. Trade at your own risk.
@@ -190,14 +220,26 @@ def send_email_alert(user_email: str, ticker: str, signal_data: dict):
 
         # Send via Gmail SSL
         password_clean = EMAIL_PASSWORD.replace(" ", "")
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(EMAIL_SENDER, password_clean)
-            server.sendmail(EMAIL_SENDER, user_email, msg.as_string())
-
-        print(f"✅ [Success] Email sent to {user_email} for {ticker}")
+        print(f"DEBUG: Attempting to connect to smtp.gmail.com:465 for {EMAIL_SENDER}...")
+        
+        try:
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as server:
+                server.login(EMAIL_SENDER, password_clean)
+                server.sendmail(EMAIL_SENDER, user_email, msg.as_string())
+            print(f"✅ [Success] Email sent to {user_email} for {ticker}")
+        except smtplib.SMTPAuthenticationError as e:
+            print(f"❌ [Auth Error] SMTP login failed. Check App Password for {EMAIL_SENDER}. Error: {e}")
+            raise
+        except smtplib.SMTPException as e:
+            print(f"❌ [SMTP Error] smtplib error during handshake/send: {e}")
+            raise
+        except Exception as e:
+            print(f"❌ [Network/TLS Error] {e}")
+            raise
 
     except Exception as e:
-        print(f"❌ [Email Failed] Could not send email: {e}")
+        print(f"❌ [Alert Execution Error] Unexpected error in send_email_alert: {e}")
+        raise
 
 # ==========================================
 # 5. THE CORE JOB (Runs at scheduled times)
@@ -220,8 +262,14 @@ def check_and_alert_job(user_email: str, ticker: str, force: bool = False, alert
         if not live:
              print(f"⚠️ [SKIP] No live data for {ticker}. Is the ML Signal API (Port 8000) running?")
              if force:
-                 print("⚠️ FORCE MODE: proceed with dummy data if live fails? No, still need data.")
-             return
+                 print("⚠️ FORCE MODE: Using dummy data for testing purposes.")
+                 live = {
+                     "signal": "TEST_SIGNAL",
+                     "current_price": 0.0,
+                     "confidence": 0.0
+                 }
+             else:
+                 return False, "ML API connection failed or returned no data."
 
         if bt:
             confidence = bt.get("confidence_score", 0)
@@ -251,7 +299,7 @@ def check_and_alert_job(user_email: str, ticker: str, force: bool = False, alert
         # Prepare Data Payload
         email_data = {
             "signal_text": signal_text,
-            "current_price": live.get("target_value", 0.0),
+            "current_price": live.get("current_price", 0.0),
             "confidence": f"{confidence:.2f}",
             "confidence_level": conf_level,
             "prediction_frequency": alert_type
@@ -263,6 +311,9 @@ def check_and_alert_job(user_email: str, ticker: str, force: bool = False, alert
 
     except Exception as e:
         print(f"❌ Alert job failed for {ticker}: {e}")
+        return False, str(e)
+    
+    return True, "Success"
 
 # ==========================================
 # 6. API ENDPOINTS (For Dashboard Team)
@@ -372,8 +423,11 @@ class InstantReportRequest(BaseModel):
 @app.post("/instant-report")
 def instant_report(request: InstantReportRequest):
     # Passes force=True to ensure email is sent for testing purposes
-    check_and_alert_job(request.user_email, request.ticker_name, force=True, alert_type="Instant Report (Manual)")
-    return {"status": "success", "message": "Report sent"}
+    success, message = check_and_alert_job(request.user_email, request.ticker_name, force=True, alert_type="Instant Report (Manual)")
+    if success:
+        return {"status": "success", "message": "Report sent"}
+    else:
+        raise HTTPException(status_code=500, detail=f"Failed to send report: {message}")
 
 @app.delete("/clear-all-alerts")
 def clear_all_alerts():

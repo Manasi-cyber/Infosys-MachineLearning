@@ -4,10 +4,16 @@ from email.mime.text import MIMEText
 from datetime import datetime
 import sys
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 # CONFIGURATION
-EMAIL_SENDER = "tarunsivasai03@gmail.com"
-EMAIL_PASSWORD = "odsi iyiq ywar zvba"
-API_URL = "http://localhost:8000/api/v1/ml/signal/live"
+EMAIL_SENDER = os.getenv("SMTP_USER", "tarunsivasai03@gmail.com")
+EMAIL_PASSWORD = os.getenv("SMTP_PASSWORD", "odsi iyiq ywar zvba")
+API_URL = os.getenv("SIGNALS_API_URL", "http://localhost:8000/api/v1/ml/signal/live")
 
 def get_stock_details(ticker):
     print(f"Fetching live data for {ticker}...")
@@ -55,7 +61,8 @@ def send_instant_email(recipient, ticker, data):
         msg['From'] = EMAIL_SENDER
         msg['To'] = recipient
 
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        print(f"DEBUG: Connecting to smtp.gmail.com:465 as {EMAIL_SENDER}...")
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as server:
             server.login(EMAIL_SENDER, EMAIL_PASSWORD)
             server.sendmail(EMAIL_SENDER, recipient, msg.as_string())
         

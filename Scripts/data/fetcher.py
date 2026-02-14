@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 import yfinance as yf
 import pandas as pd
@@ -25,6 +26,30 @@ except ImportError:
 
 class DataEngine:
     _api_unreachable = False
+
+    _usd_inr_rate = None
+
+    @staticmethod
+    def _get_usd_inr_rate():
+        """Fetch USD to INR rate once per session"""
+        if DataEngine._usd_inr_rate is None:
+            try:
+                rate = yf.download("USDINR=X", period="1d", interval="1d", progress=False)["Close"].iloc[-1]
+                DataEngine._usd_inr_rate = float(rate)
+            except Exception as e:
+                print(f"⚠️ USDINR fetch failed: {e}")
+                DataEngine._usd_inr_rate = 83.0  # Safe fallback
+        return DataEngine._usd_inr_rate
+    
+
+    @staticmethod
+    def _convert_to_inr(symbol: str, price: float) -> float:
+        """Convert USD price to INR for foreign stocks"""
+        if not symbol.upper().endswith(".NS"):
+            rate = DataEngine._get_usd_inr_rate()
+            return price * rate
+        return price
+    
 
     @staticmethod
     def fetch_data(symbol: str, period: str = "1y", interval: str = "1d", 
@@ -137,10 +162,10 @@ class DataEngine:
             
             # 2. Extract Basic Data
             dates = df['date'].dt.strftime('%Y-%m-%d').tolist() if 'date' in df.columns else []
-            closes = df['close'].tolist() if 'close' in df.columns else []
-            opens = df['open'].tolist() if 'open' in df.columns else []
-            highs = df['high'].tolist() if 'high' in df.columns else []
-            lows = df['low'].tolist() if 'low' in df.columns else []
+            opens = [DataEngine._convert_to_inr(symbol, float(p)) for p in opens]
+            highs = [DataEngine._convert_to_inr(symbol, float(p)) for p in highs]
+            lows = [DataEngine._convert_to_inr(symbol, float(p)) for p in lows]
+            closes = [DataEngine._convert_to_inr(symbol, float(p)) for p in closes]
             volumes = df['volume'].tolist() if 'volume' in df.columns else []
             
             if not closes:
@@ -177,8 +202,9 @@ class DataEngine:
             macd_hist = macd_hist_series.fillna(0).tolist()
 
             # 4. Summary Stats
-            current_price = closes[-1]
-            prev_close = closes[-2] if len(closes) > 1 else current_price
+            current_price = DataEngine._convert_to_inr(symbol, closes[-1])
+            prev_close = DataEngine._convert_to_inr(symbol, closes[-2] if len(closes) > 1 else closes[-1])
+
             price_change = current_price - prev_close
             price_change_pct = (price_change / prev_close) * 100 if prev_close != 0 else 0.0
             
@@ -245,10 +271,21 @@ class DataEngine:
                 current_price = df['Close'].iloc[-1]
                 prev_close = df['Close'].iloc[-2] if len(df) > 1 else df['Close'].iloc[-1]
 
+            # Convert currency if needed
+            current_price = DataEngine._convert_to_inr(symbol, float(current_price))
+            prev_close = DataEngine._convert_to_inr(symbol, float(prev_close))
+
             price_change = current_price - prev_close
             price_change_pct = (price_change / prev_close) * 100 if prev_close else 0
+
             
             market_status = "Open" if datetime.now().weekday() < 5 else "Closed"
+
+            opens = [DataEngine._convert_to_inr(symbol, float(p)) for p in df['Open']]
+            highs = [DataEngine._convert_to_inr(symbol, float(p)) for p in df['High']]
+            lows = [DataEngine._convert_to_inr(symbol, float(p)) for p in df['Low']]
+            closes = [DataEngine._convert_to_inr(symbol, float(p)) for p in df['Close']]
+
 
             return StockData(
                 symbol=symbol.upper(),
@@ -258,10 +295,10 @@ class DataEngine:
                 last_updated=datetime.now(),
                 market_status=market_status,
                 dates=df.index.strftime('%Y-%m-%d').tolist(),
-                opens=df['Open'].tolist(),
-                highs=df['High'].tolist(),
-                lows=df['Low'].tolist(),
-                closes=df['Close'].tolist(),
+                opens=opens,
+                highs=highs,
+                lows=lows,
+                closes=closes,
                 volumes=df['Volume'].astype(int).tolist(),
                 rsi=df['RSI'].tolist(),
                 sma_20=df['SMA_20'].tolist(),

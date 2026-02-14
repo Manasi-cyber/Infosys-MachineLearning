@@ -61,7 +61,7 @@ def read_root():
 # =================================================
 # LOAD MODELS
 # =================================================
-MODEL_PATH = "C:/infosys1/AI-powered-stock-and-ETF-trading-platform/ml/models/rf_model.pkl"
+MODEL_PATH = "C:/infosys1/Scripts/ml/models/rf_model.pkl"
 
 # Update model loading to use the absolute path
 try:
@@ -231,6 +231,7 @@ def get_live_signal(request: TickerRequest):
         result = prediction.dict()
         # Add historical-compatible fields if necessary
         result["signal"] = result["action"]
+        result["current_price"] = stock_data.current_price
         result["expected_return"] = 0.0 # Heuristics don't provide easy return %
         
         return result
@@ -492,7 +493,7 @@ def search_by_rsi(
          return {"results": [], "error": str(e)}
 
 # Update the absolute path to the model file
-MODEL_PATH = "C:/infosys1/AI-powered-stock-and-ETF-trading-platform/ml/models/rf_model.pkl"
+MODEL_PATH = "C:/infosys1/Scripts/ml/models/rf_model.pkl"
 # Update the code to use MODEL_PATH when loading the model
 
 if __name__ == "__main__":
